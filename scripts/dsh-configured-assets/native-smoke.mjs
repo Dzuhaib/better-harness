@@ -39,14 +39,22 @@ const DSH_PACKAGES = [
   "@deepseek-ai/dsh-tools",
 ];
 
-// The DSH owners peer-depend on the whole cordis family, and the sibling
-// `cordis-plugin-*` packages are not pinned here, so npm re-resolves them on
-// every run. This pin must stay at or above the highest cordis floor those
-// siblings declare, otherwise an upstream sibling release fails the install
-// with ERESOLVE before any assertion runs.
+// `dsh-app-boot` peer-depends on the `cordis-plugin-*` siblings with caret
+// ranges, and each sibling release raises its own cordis floor. Pinning the
+// whole family keeps the install reproducible: bump these together, keeping
+// cordis at or above the floor every pinned sibling declares, or npm fails
+// the install with ERESOLVE before any assertion runs.
+const CORDIS_FAMILY = [
+  "@deepseek-ai/cordis@4.0.5",
+  "@deepseek-ai/cordis-plugin-group@1.0.5",
+  "@deepseek-ai/cordis-plugin-hmr@1.0.20",
+  "@deepseek-ai/cordis-plugin-include@1.0.10",
+  "@deepseek-ai/cordis-plugin-loader@1.0.6",
+];
+
 async function installNativeOwners(prefix) {
   const specs = [
-    "@deepseek-ai/cordis@4.0.5",
+    ...CORDIS_FAMILY,
     ...DSH_PACKAGES.map((packageName) => `${packageName}@${DSH_NATIVE_VERSION}`),
   ];
   const args = [
