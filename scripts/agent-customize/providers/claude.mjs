@@ -167,6 +167,7 @@ async function collectProjectRules(workspace, sourceLabel, claudeRoot = path.joi
       "claude-project",
     ],
     [path.join(workspace, "CLAUDE.local.md"), "CLAUDE.local.md", "claude-local", "claude-local"],
+    [path.join(workspace, "AGENTS.md"), "AGENTS.md", "agents-md-compat", "agents-md-compat"],
   ];
   const files = [];
   const visited = new Set();
