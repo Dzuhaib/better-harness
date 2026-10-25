@@ -137,10 +137,10 @@ function collectHistoryStats(commits, allowedLanguages, analysisScope) {
   };
 }
 
-function readHistoryLog(repoRoot, maxCommits, analysisScope, sinceSeconds) {
+function readHistoryLog(repoRoot, commitLimit, analysisScope, sinceSeconds) {
   const args = [
     "log",
-    `-${maxCommits}`,
+    `-${commitLimit}`,
     "--numstat",
     "--format=commit%x1f%H%x1f%ct%x1f%s",
   ];
@@ -155,19 +155,22 @@ function historyWindows(commits, allowedLanguages, daysList, analysisScope, {
   repoRoot,
   maxCommits,
   ignore,
+  mainTruncated,
 }) {
   const nowSeconds = Math.floor(Date.now() / 1000);
   return daysList.map((days) => {
     const sinceSeconds = nowSeconds - days * 24 * 60 * 60;
-    const windowParsed = commits.length === 0
-      ? []
-      : readHistoryLog(repoRoot, maxCommits, analysisScope, sinceSeconds);
-    const windowCommits = commits.length === 0
-      ? []
-      : applyCommitIgnores(windowParsed, ignore).commits;
+    const oldestTimestamp = commits.at(-1)?.timestamp;
+    const scanCoversWindow = !mainTruncated
+      || (oldestTimestamp !== undefined && oldestTimestamp < sinceSeconds);
+    const windowParsed = scanCoversWindow
+      ? commits.filter((commit) => commit.timestamp >= sinceSeconds)
+      : readHistoryLog(repoRoot, maxCommits + 1, analysisScope, sinceSeconds);
+    const truncated = windowParsed.length > maxCommits;
+    const boundedParsed = truncated ? windowParsed.slice(0, maxCommits) : windowParsed;
+    const windowCommits = applyCommitIgnores(boundedParsed, ignore).commits;
     const stats = collectHistoryStats(windowCommits, allowedLanguages, analysisScope);
     const trend = trendForWindow(days, windowCommits.length);
-    const truncated = windowParsed.length >= maxCommits;
 
     return {
       days,
@@ -198,7 +201,7 @@ function trendForWindow(days, analyzedCommits) {
   };
 }
 
-function historyConfidence(commits, maxCommits) {
+function historyConfidence(commits, maxCommits, truncated) {
   if (commits.length === 0) {
     return { confidence: "low", reasons: ["no commits were available in the bounded history scan"] };
   }
@@ -215,7 +218,7 @@ function historyConfidence(commits, maxCommits) {
   if (spanDays < 30) {
     reasons.push(`history span is only ${spanDays} days`);
   }
-  if (commits.length >= maxCommits) {
+  if (truncated) {
     reasons.push(`bounded at maxCommits=${maxCommits}`);
   }
   return {
@@ -256,7 +259,7 @@ export async function analyzeGitHistoryProfile(options = {}) {
   const allowedLanguages = new Set(normalizeLanguages(options.languages));
   let parsedCommits;
   try {
-    parsedCommits = readHistoryLog(repoRoot, maxCommits, analysisScope);
+    parsedCommits = readHistoryLog(repoRoot, maxCommits + 1, analysisScope);
   } catch (error) {
     // An unborn repository is a valid empty history. Every other Git failure,
     // including a malformed scope/pathspec, remains a hard coverage failure.
@@ -270,6 +273,10 @@ export async function analyzeGitHistoryProfile(options = {}) {
       }
     }
     if (parsedCommits === undefined) throw error;
+  }
+  const mainTruncated = parsedCommits.length > maxCommits;
+  if (mainTruncated) {
+    parsedCommits = parsedCommits.slice(0, maxCommits);
   }
   const filteredHistory = applyCommitIgnores(parsedCommits, options.ignore);
   const commits = filteredHistory.commits;
@@ -289,11 +296,12 @@ export async function analyzeGitHistoryProfile(options = {}) {
       newest: commits[0]?.shortSha ?? null,
       oldest: commits.at(-1)?.shortSha ?? null,
     },
-    confidence: historyConfidence(commits, maxCommits),
+    confidence: historyConfidence(commits, maxCommits, mainTruncated),
     historyWindows: historyWindows(commits, allowedLanguages, windowDays, analysisScope, {
       repoRoot,
       maxCommits,
       ignore: options.ignore,
+      mainTruncated,
     }),
     languageTouchCounts: sortedCounts(stats.languageStats, 12).map((item) => ({
       language: item.name,

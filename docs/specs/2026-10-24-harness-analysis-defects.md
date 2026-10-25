@@ -24,23 +24,33 @@ analysis must continue to fail closed when real binding conflicts exist.
 
 - AC-1: `--qoder-home` remains explicit and wins over environment/defaults, and
   help for `harness analyze`, `harness evidence-bundle`, and task-loop source
-  advertises the option. `QODER_HOME` is honored by the Qoder session analyzer,
-  including a `.qoder-cn` asset home, and the default selects an existing
-  `~/.qoder-cn` before `~/.qoder`.
-- AC-2: history windows use independent git ranges instead of slicing one global
-  commit list, so 30/90/180-day windows can report different commit counts and
-  hotspots. Every window exposes its commit limit, truncation state, and coverage
-  status.
+  advertises the option. `QODER_HOME` is honored by the Qoder session analyzer
+  only when it names an asset home (including `.qoder-cn`); a shared-client-cache
+  value is ignored. The default prefers `~/.qoder-cn` only when `~/.qoder` is
+  absent or has no session data.
+- AC-2: history windows report independent ranges, so 30/90/180-day windows can
+  report different commit counts and hotspots. A window reuses the bounded main
+  scan when that scan reaches older than the window, and queries Git for the
+  window otherwise. Every window exposes its commit limit, truncation state, and
+  coverage status, with truncation exact at the limit.
 - AC-3: `history-window-coverage` is `review` rather than `ready` when history
   confidence is low or any window is truncated, while retaining the existing
-  ready behavior for complete high/medium-confidence history.
+  ready behavior for complete high/medium-confidence history. The matrix note
+  explains that raising `--max-commits` completes the 30/90/180-day windows in a
+  very active repository.
 - AC-4: instruction analysis recognizes root and nested `AGENTS.md` and
-  `CLAUDE.md` carriers, excludes scratch directories from suggested scopes, and
-  reports carrier kinds without changing the existing density thresholds.
+  `CLAUDE.md` carriers, counts each directory scope once when both carriers
+  exist, excludes scratch directories from suggested scopes and the suggested
+  instruction minimum, and reports carrier kinds without changing the existing
+  density thresholds.
 - AC-5: evidence packs expose project-owned package and Just gates, and the
-  `validate-impact` action includes those exact commands when available.
+  `validate-impact` action includes those exact commands when available. Gates
+  that start long-running watchers, dev servers, or UI/open-headed sessions are
+  not presented as validation commands.
 - AC-6: Claude project Rules inventory includes a root `AGENTS.md` compatibility
-  entry without duplicating `CLAUDE.md`.
+  entry without duplicating `CLAUDE.md`. This relies on Claude Code reading
+  `AGENTS.md` as project instructions; see
+  <https://code.claude.com/docs/en/memory#agents-md>.
 - AC-7: an integration test proves an injected session population keeps the lead
   lane available and carries `sessionBinding`, while the genuine conflict test
   still downgrades the lead to `SESSION_POPULATION_BINDING_MISMATCH`.
@@ -59,8 +69,9 @@ analysis must continue to fail closed when real binding conflicts exist.
 
 1. Align Qoder home resolution across asset and session analysis, and document
    the accepted host-home option.
-2. Fetch and filter each history window independently, add coverage metadata,
-   and make the review matrix consume it.
+2. Fetch and filter each history window independently, reuse the main scan when
+   it covers the window, add coverage metadata, and make the review matrix
+   consume it.
 3. Extend instruction carriers, scope filtering, and project gate extraction.
 4. Add root `AGENTS.md` to the Claude Rules inventory.
 5. Add a lead/session binding integration regression and keep the conflict test.
@@ -74,10 +85,12 @@ analysis must continue to fail closed when real binding conflicts exist.
 - `test/agents/agent-customize.test.mjs` covers Qoder provider `QODER_HOME`
   resolution and the Claude Rules root `AGENTS.md` compatibility entry.
 - `test/sessions/session-analysis.test.mjs` exercises Qoder session roots from
-  `QODER_HOME` and the `~/.qoder-cn` default.
+  `QODER_HOME`, rejects a non-asset `QODER_HOME` (shared client cache), the
+  `~/.qoder-cn` default, and the both-homes preference.
 - `test/governance/core-change-watch.test.mjs` covers independent history
-  windows, truncation downgrade, instruction carriers, scratch-scope exclusion,
-  and project gates in the `validate-impact` action.
+  windows, exact truncation at the commit limit, instruction scope deduplication,
+  scratch-scope exclusion, non-terminating gate exclusion, and project gates in
+  the `validate-impact` action.
 - `test/reporting/better-harness-evidence-bundle.test.mjs` exercises the real
   Claude lead/session binding path and keeps the genuine conflict regression.
 - `packages/harness-studio-apps/test/test_file_explorer.mjs` passes on Windows
@@ -86,4 +99,4 @@ analysis must continue to fail closed when real binding conflicts exist.
   junctions and skips only the two file-symlink cases when the host denies them.
 - The DSH explicit-root fixture isolates `HOME`/`USERPROFILE`, so external roots
   are not accidentally classified as user-home paths.
-- Full `npm test` on 2026-10-25: 1765 passed, 30 skipped, 0 failed.
+- Full `npm test` on 2026-10-25: 1767 passed, 30 skipped, 0 failed.

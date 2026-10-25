@@ -3,7 +3,10 @@ import os from "node:os";
 import path from "node:path";
 
 const QODER_ASSET_HOME_NAMES = new Set([".qoder", "qoder", ".qoder-cn", "qoder-cn"]);
+const QODER_SESSION_DIRECTORIES = ["audit", "logs", "projects", "sessions"];
 
+// Kept local because session-analysis re-exports the Qoder analyzer that
+// imports this module, and the refactor contract forbids deep imports.
 function expandHome(filePath) {
   if (!filePath) return filePath;
   if (filePath === "~") return os.homedir();
@@ -11,14 +14,28 @@ function expandHome(filePath) {
   return filePath;
 }
 
+function environmentFor(options = {}) {
+  return options.env ?? process.env;
+}
+
 export function looksLikeQoderAssetHome(candidate) {
   return QODER_ASSET_HOME_NAMES.has(path.basename(String(candidate ?? "")).toLowerCase());
 }
 
+function hasQoderSessionData(home) {
+  return QODER_SESSION_DIRECTORIES.some((directory) => existsSync(path.join(home, directory)));
+}
+
 export function defaultQoderHome() {
+  const internationalHome = path.join(os.homedir(), ".qoder");
   const cnHome = path.join(os.homedir(), ".qoder-cn");
-  if (existsSync(cnHome)) return cnHome;
-  return path.join(os.homedir(), ".qoder");
+  const cnExists = existsSync(cnHome);
+  if (!cnExists) return internationalHome;
+  const internationalExists = existsSync(internationalHome);
+  if (!internationalExists) return cnHome;
+  const cnHasSessions = hasQoderSessionData(cnHome);
+  const internationalHasSessions = hasQoderSessionData(internationalHome);
+  return cnHasSessions && !internationalHasSessions ? cnHome : internationalHome;
 }
 
 export function defaultQoderSharedClientCacheRoot() {
@@ -36,7 +53,7 @@ export function defaultQoderSharedClientCacheRoot() {
 export function resolveQoderAssetHome(options = {}) {
   const explicit = options.qoderHome ?? options["qoder-home"];
   if (explicit) return path.resolve(expandHome(explicit));
-  const environmentHome = process.env.QODER_HOME;
+  const environmentHome = environmentFor(options).QODER_HOME;
   if (environmentHome && looksLikeQoderAssetHome(environmentHome)) {
     return path.resolve(expandHome(environmentHome));
   }
@@ -46,8 +63,10 @@ export function resolveQoderAssetHome(options = {}) {
 export function resolveQoderSessionHome(options = {}) {
   const explicit = options.home ?? options.qoderHome ?? options["qoder-home"];
   if (explicit) return path.resolve(expandHome(explicit));
-  const environmentHome = process.env.QODER_HOME;
-  if (environmentHome) return path.resolve(expandHome(environmentHome));
+  const environmentHome = environmentFor(options).QODER_HOME;
+  if (environmentHome && looksLikeQoderAssetHome(environmentHome)) {
+    return path.resolve(expandHome(environmentHome));
+  }
   return defaultQoderHome();
 }
 
@@ -57,7 +76,7 @@ export function resolveQoderSharedClientCacheRoot(options = {}) {
     options["qoder-shared-client-cache-root"] ??
     options.sharedClientCacheRoot;
   if (explicit) return path.resolve(expandHome(explicit));
-  const environmentHome = process.env.QODER_HOME;
+  const environmentHome = environmentFor(options).QODER_HOME;
   if (environmentHome && !looksLikeQoderAssetHome(environmentHome)) {
     return path.resolve(expandHome(environmentHome));
   }

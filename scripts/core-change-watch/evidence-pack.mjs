@@ -413,7 +413,7 @@ function buildReviewMatrix(projectProfile, historyProfile, coreAnalysis, diffImp
         truncatedWindows: historyProfile.historyWindows.filter((item) => item.truncated).map((item) => item.days),
         coverage: historyProfile.historyWindows.map((item) => ({ days: item.days, status: item.coverage })),
       },
-      "Low history confidence or a bounded-window truncation should downgrade hotspot certainty, not block source inspection.",
+      "Low history confidence or a bounded-window truncation should downgrade hotspot certainty, not block source inspection. Raise --max-commits to complete the 30/90/180-day windows in an active repository.",
     ),
     matrixItem(
       "large-repo-safety",

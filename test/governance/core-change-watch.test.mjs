@@ -287,7 +287,7 @@ test("AGENTS instruction density uses file count instead of line count", async (
   }
 });
 
-test("project profile treats AGENTS.md and CLAUDE.md as first-class instruction carriers", async () => {
+test("project profile counts one instruction scope when AGENTS.md and CLAUDE.md share it", async () => {
   const repo = await makeRepo({
     "package.json": JSON.stringify({ name: "dual-carrier-instructions" }),
     "AGENTS.md": "# Root agent rules\n",
@@ -300,9 +300,10 @@ test("project profile treats AGENTS.md and CLAUDE.md as first-class instruction 
   try {
     const profile = await analyzeProjectProfile({ cwd: repo });
 
-    assert.equal(profile.agentInstructions.count, 4);
-    assert.equal(profile.agentInstructions.rootCount, 2);
-    assert.equal(profile.agentInstructions.nestedCount, 2);
+    assert.equal(profile.agentInstructions.count, 2);
+    assert.equal(profile.agentInstructions.rootCount, 1);
+    assert.equal(profile.agentInstructions.nestedCount, 1);
+    assert.equal(profile.agentInstructions.files.length, 4);
     assert.deepEqual(
       profile.agentInstructions.carriers.map((item) => `${item.name}:${item.files}`),
       ["AGENTS.md:2", "CLAUDE.md:2"],
@@ -357,6 +358,9 @@ test("project-owned validation gates surface in the profile and validate-impact 
         serve: "node server.mjs",
         test: "node --test",
         "test:unit": "node --test unit",
+        "test:watch": "node --test --watch",
+        "test:ui": "playwright test --ui",
+        "lint:dev": "node lint-dev.mjs",
       },
     }),
     "justfile": [
@@ -390,6 +394,7 @@ test("project-owned validation gates surface in the profile and validate-impact 
       "package-script:packages/api/package.json:test",
     ]);
     assert.equal(discovered.some((gate) => /:custom$|:serve$|:deploy$/u.test(gate)), false);
+    assert.equal(discovered.some((gate) => /:test:watch$|:test:ui$|:lint:dev$/u.test(gate)), false);
     assert.deepEqual(
       profile.projectGates.find((gate) => gate.sourcePath === "packages/api/package.json")?.command,
       ["npm", "--prefix", "packages/api", "run", "test"],
@@ -565,6 +570,11 @@ test("history windows read independent commit ranges and disclose bounded covera
     assert.equal(coverage.status, "review");
     assert.deepEqual(coverage.evidence.truncatedWindows, [30, 90, 180]);
     assert.deepEqual(coverage.evidence.coverage.map((item) => item.status), ["truncated", "truncated", "truncated"]);
+
+    const exact = await analyzeGitHistoryProfile({ cwd: repo, maxCommits: 4, historyWindows: "30" });
+    assert.equal(exact.historyWindows[0].analyzedCommits, 4);
+    assert.equal(exact.historyWindows[0].truncated, false);
+    assert.equal(exact.historyWindows[0].coverage, "complete");
   } finally {
     await rm(repo, { recursive: true, force: true });
   }
