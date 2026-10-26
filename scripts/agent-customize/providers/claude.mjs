@@ -167,7 +167,7 @@ async function collectProjectRules(workspace, sourceLabel, claudeRoot = path.joi
       "claude-project",
     ],
     [path.join(workspace, "CLAUDE.local.md"), "CLAUDE.local.md", "claude-local", "claude-local"],
-    // Claude Code reads a root AGENTS.md when no CLAUDE.md claims the project.
+    // Claude Code also reads a root AGENTS.md, so collect it alongside CLAUDE.md.
     // See https://code.claude.com/docs/en/memory#agents-md.
     [path.join(workspace, "AGENTS.md"), "AGENTS.md", "agents-md-compat", "agents-md-compat"],
   ];

@@ -869,7 +869,7 @@ test("Qoder default home keeps the international home when both homes have sessi
   const cnHome = path.join(international.root, ".qoder-cn");
 
   try {
-    await mkdir(path.join(cnHome, "projects"), { recursive: true });
+    await mkdir(path.join(cnHome, "audit"), { recursive: true });
     delete process.env.QODER_HOME;
     process.env.HOME = international.root;
     process.env.USERPROFILE = international.root;

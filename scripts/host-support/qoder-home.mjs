@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 
 const QODER_ASSET_HOME_NAMES = new Set([".qoder", "qoder", ".qoder-cn", "qoder-cn"]);
-const QODER_SESSION_DIRECTORIES = ["audit", "logs", "projects", "sessions"];
+const QODER_SESSION_DIRECTORIES = ["audit", "logs"];
 
 // Kept local because session-analysis re-exports the Qoder analyzer that
 // imports this module, and the refactor contract forbids deep imports.
